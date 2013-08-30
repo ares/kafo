@@ -1,4 +1,5 @@
 # encoding: UTF-8
+require 'facter'
 require 'pty'
 require 'clamp'
 require 'kafo/exceptions'
@@ -229,9 +230,17 @@ class KafoConfigure < Clamp::Command
   end
 
   def set_env
-    # Puppet tries to determine FQDN from /etc/resolv.conf and we do NOT want this behavior
-    facter_hostname = Socket.gethostname
-    ENV['FACTER_fqdn'] = facter_hostname
+    # Use handy gem trick to compare versions
+    unless Gem::Version.new(Facter.version) >= Gem::Version.new('1.7')
+      # Facter 1.6 tries to determine FQDN from /etc/resolv.conf and we do NOT want this behavior
+      fqdn_exit("'facter fqdn' does not match 'hostname -f'") unless Facter.fqdn == `hostname -f`.chomp
+    end
+    fqdn_exit("Invalid FQDN: #{Facter.fqdn}, check your hostname") unless Facter.fqdn.include?('.')
+  end
+
+  def fqdn_exit(message)
+    puts message
+    exit(:invalid_system)
   end
 
   def config_file
